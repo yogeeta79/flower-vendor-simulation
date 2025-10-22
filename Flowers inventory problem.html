@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Inventory Simulation - Flower Vendor</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #0b1220;
+      --accent: #06b6d4;
+      --muted: #94a3b8;
+      --glass: rgba(255,255,255,0.03);
+    }
+    body {
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(180deg, #021021 0%, #071428 100%);
+      color: #e6eef6;
+      margin: 0;
+      padding: 28px;
+    }
+    .app { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 6px; color: #06b6d4; }
+    p.lead { color: var(--muted); font-size: 13px; margin-top: 0; }
+    .card {
+      background: var(--card);
+      padding: 18px;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(2,6,23,0.6);
+      margin-bottom: 18px;
+    }
+    label { font-size: 13px; color: var(--muted); }
+    input[type=number] {
+      background: var(--glass);
+      border: 1px solid rgba(255,255,255,0.04);
+      padding: 8px 10px;
+      border-radius: 8px;
+      color: inherit;
+      width: 80px;
+    }
+    button {
+      background-color: var(--accent);
+      color: #022;
+      border: none;
+      padding: 9px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 22px;
+    }
+    button:hover { background-color: #09c7e7; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 18px;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border-bottom: 1px dashed rgba(255,255,255,0.05);
+    }
+    th { color: var(--muted); font-weight: 600; }
+    tr:nth-child(even) { background-color: rgba(255,255,255,0.02); }
+    .summary {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+    .stat {
+      background: rgba(255,255,255,0.03);
+      padding: 10px 14px;
+      border-radius: 10px;
+      min-width: 150px;
+      text-align: center;
+    }
+    .stat div:first-child {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .stat div:last-child {
+      font-size: 18px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Flower Vendor — Inventory Simulation</h1>
+    <p class="lead">Simulate daily profits by changing costs, prices, and order quantity.</p>
+
+    <section class="card">
+      <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;">
+        <div>
+          <label>Order Quantity (Q)</label><br>
+          <input id="orderQ" type="number" value="35" min="5" step="5">
+        </div>
+        <div>
+          <label>Days to Simulate</label><br>
+          <input id="days" type="number" value="25" min="1" step="1">
+        </div>
+        <div>
+          <label>Buying Cost ($)</label><br>
+          <input id="buyPrice" type="number" value="8" min="0">
+        </div>
+        <div>
+          <label>Selling Price ($)</label><br>
+          <input id="sellPrice" type="number" value="15" min="0">
+        </div>
+        <div>
+          <label>Arrangement Return ($)</label><br>
+          <input id="arrangementPrice" type="number" value="3" min="0">
+        </div>
+        <div>
+          <label>Lost Profit ($)</label><br>
+          <input id="lostProfit" type="number" value="7" min="0">
+        </div>
+        <div>
+          <button id="run">Run Simulation</button>
+        </div>
+      </div>
+
+      <p style="font-size:13px;color:var(--muted);margin-top:14px;">
+        Demand Scenarios: Peak = 40 (p=0.25), Normal = 30 (p=0.50), Slow = 20 (p=0.25)
+      </p>
+    </section>
+
+    <section class="card">
+      <div class="summary">
+        <div class="stat">
+          <div>Theoretical Daily Profit</div>
+          <div id="theoDaily">—</div>
+        </div>
+        <div class="stat">
+          <div>Theoretical Total (25 days)</div>
+          <div id="theoTotal">—</div>
+        </div>
+        <div class="stat">
+          <div>Simulated Total Profit</div>
+          <div id="simTotal">—</div>
+        </div>
+        <div class="stat">
+          <div>Average Daily Profit</div>
+          <div id="simAvg">—</div>
+        </div>
+      </div>
+
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>Day Type</th>
+            <th>Demand</th>
+            <th>Sold</th>
+            <th>Arrangements</th>
+            <th>Profit ($)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    const scenarios = [
+      { type: "Peak", demand: 40, prob: 0.25 },
+      { type: "Normal", demand: 30, prob: 0.50 },
+      { type: "Slow", demand: 20, prob: 0.25 },
+    ];
+
+    function computeProfit(Q, demand, prices) {
+      const { buyPrice, sellPrice, arrangementPrice, lostProfit } = prices;
+      const sold = Math.min(Q, demand);
+      const leftover = Math.max(0, Q - demand);
+      const unmet = Math.max(0, demand - Q);
+      const profit =
+        sold * (sellPrice - buyPrice) +
+        leftover * (arrangementPrice - buyPrice) -
+        unmet * lostProfit;
+      return { sold, leftover, unmet, profit };
+    }
+
+    function theoretical(Q, prices) {
+      const peak = computeProfit(Q, 40, prices).profit;
+      const normal = computeProfit(Q, 30, prices).profit;
+      const slow = computeProfit(Q, 20, prices).profit;
+      const daily = 0.25 * peak + 0.5 * normal + 0.25 * slow;
+      return { daily, peak, normal, slow };
+    }
+
+    document.getElementById("run").addEventListener("click", () => {
+      const Q = parseInt(document.getElementById("orderQ").value, 10);
+      const days = parseInt(document.getElementById("days").value, 10);
+      const prices = {
+        buyPrice: parseFloat(document.getElementById("buyPrice").value),
+        sellPrice: parseFloat(document.getElementById("sellPrice").value),
+        arrangementPrice: parseFloat(document.getElementById("arrangementPrice").value),
+        lostProfit: parseFloat(document.getElementById("lostProfit").value)
+      };
+
+      const tbody = document.querySelector("#resultTable tbody");
+      tbody.innerHTML = "";
+
+      const th = theoretical(Q, prices);
+      document.getElementById("theoDaily").textContent = "$" + th.daily.toFixed(2);
+      document.getElementById("theoTotal").textContent = "$" + (th.daily * days).toFixed(2);
+
+      let total = 0;
+      for (let i = 1; i <= days; i++) {
+        const rand = Math.random();
+        let scenario;
+        if (rand < 0.25) scenario = scenarios[0];
+        else if (rand < 0.75) scenario = scenarios[1];
+        else scenario = scenarios[2];
+
+        const { sold, leftover, profit } = computeProfit(Q, scenario.demand, prices);
+        total += profit;
+
+        const row = `<tr>
+          <td>${i}</td>
+          <td>${scenario.type}</td>
+          <td>${scenario.demand}</td>
+          <td>${sold}</td>
+          <td>${Math.max(0, Q - scenario.demand)}</td>
+          <td>$${profit.toFixed(2)}</td>
+        </tr>`;
+        tbody.innerHTML += row;
+      }
+
+      document.getElementById("simTotal").textContent = "$" + total.toFixed(2);
+      document.getElementById("simAvg").textContent = "$" + (total / days).toFixed(2);
+    });
+  </script>
+</body>
+</html>

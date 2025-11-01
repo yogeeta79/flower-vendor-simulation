@@ -47,3 +47,7 @@ HTML: Structure and input fields
 CSS: Styling (modern dark UI)
 
 JavaScript: Simulation logic and DOM updates
+
+**UI Screenshot:**
+
+<img width="1511" height="837" alt="Screenshot 2025-11-01 153955" src="https://github.com/user-attachments/assets/4847a818-0037-40e1-9c02-ff23461b93d4" />
